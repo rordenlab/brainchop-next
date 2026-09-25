@@ -1,0 +1,36 @@
+name: Build and Deploy
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+# JamesIves/github-pages-deploy-action pushes to gh-pages; the default GITHUB_TOKEN
+# is read-only for new repos, so grant write explicitly.
+permissions:
+  contents: write
+concurrency:
+  group: pages
+  cancel-in-progress: false # never abort a deploy midway
+jobs:
+  build-and-deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v5
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: 1.3.13
+
+      - name: Install, test and build
+        run: |
+          bun install --frozen-lockfile
+          bun test src
+          bun run build
+
+      - name: Deploy
+        uses: JamesIves/github-pages-deploy-action@v4
+        with:
+          branch: gh-pages # GitHub Pages serves the site from this branch.
+          folder: dist # Vite build output (relative base './', so it works under /brainchop-next/).

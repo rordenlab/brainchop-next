@@ -1,0 +1,209 @@
+<!doctype html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <link rel="icon" type="image/x-icon" href="favicon.ico" />
+  <link rel="stylesheet" href="./src/style.css" />
+  <title>AI powered brain segmentation</title>
+</head>
+
+<body>
+  <header>
+    <div class="opacity-stack" title="Layer opacity">
+      <div class="opacity-row">
+        <span class="opacity-label">BG</span>
+        <input type="range" min="0" max="1" step="0.1" value="1" class="mini-slider" id="opacitySlider0"
+          aria-label="Background opacity" />
+      </div>
+      <div class="opacity-row">
+        <span class="opacity-label">OVL</span>
+        <input type="range" min="0" max="1" step="0.1" value="0.5" class="mini-slider" id="opacitySlider1"
+          aria-label="Overlay opacity" />
+      </div>
+    </div>
+
+    <span class="tb-divider"></span>
+
+    <select id="modelSelect" class="model-select" title="Choose a segmentation model to run">
+      <option value="" disabled selected hidden>Run Segmentation Model</option>
+      <option value="mindgrab">&#x1FA93;&#x1F9E0; omnimodal Skull Stripping</option>
+      <option value="16chan18cls">&#x26A1;&#x1FA93; Subcortical + GWM (fast)</option>
+      <option value="mindmap">&#x1FA93; Subcortical + GWM</option>
+      <option value="pve">&#x2154;&#x1F9E0; Tissue fraction maps (GM/WM/CSF)</option>
+      <option value="mindsnap">&#x1FA93;&#x1F52A; Aparc+Aseg 104</option>
+    </select>
+    <select id="seriesSelect" class="model-select" title="Choose a converted DICOM series" hidden></select>
+
+    <span class="tb-divider"></span>
+
+    <!-- values are DRAG_MODE, applied to the right button (secondaryDragMode) -->
+    <div class="segmented segmented-icons" id="dragSegmented" role="group" aria-label="Mouse drag mode">
+      <button type="button" data-drag="3" title="Pan / zoom" aria-label="Pan / zoom">
+        <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+          <path d="M12 2v20M2 12h20" />
+          <path d="M9 5l3-3 3 3M9 19l3 3 3-3M5 9l-3 3 3 3M19 9l3 3-3 3" />
+        </svg>
+      </button>
+      <button type="button" data-drag="1" title="Brightness / contrast" aria-label="Brightness / contrast">
+        <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+          <circle cx="12" cy="12" r="9" />
+          <path d="M12 3v18a9 9 0 0 0 0-18z" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+      <button type="button" data-drag="2" title="Measure a distance" aria-label="Measure a distance">
+        <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+          <rect x="2.5" y="8.5" width="19" height="7" rx="1" />
+          <path d="M7 8.5v3M11 8.5v4M15 8.5v3M19 8.5v3" />
+        </svg>
+      </button>
+      <button type="button" data-drag="4" class="active" title="Drag to reslice in 3D" aria-label="Reslice in 3D">
+        <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+          <path d="M12 2.5l8.5 4.9v9.2L12 21.5l-8.5-4.9V7.4z" />
+          <path d="M12 12v9.5M3.5 7l8.5 5 8.5-5" />
+        </svg>
+      </button>
+    </div>
+
+    <div class="popover-wrap">
+      <button type="button" id="viewBtn" class="tb-icon-btn" aria-haspopup="true" aria-expanded="false"
+        title="3D view: shading and renderer" aria-label="3D view options">
+        <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+          <circle cx="12" cy="12" r="8.5" />
+          <circle cx="9.2" cy="9.2" r="2.2" fill="currentColor" stroke="none" />
+        </svg>
+      </button>
+      <div id="viewPopover" class="popover" hidden>
+        <div class="popover-section">
+          <span class="popover-title">Shading</span>
+          <input type="range" min="0" max="1" step="0.1" value="0" id="shadingSlider"
+            aria-label="Matcap shading strength in the 3D render" />
+        </div>
+        <div class="popover-section">
+          <span class="popover-title">Renderer</span>
+          <div class="popover-row" id="rendererRow">
+            <button type="button" data-backend="webgl2" class="chip active">WebGL2</button>
+            <button type="button" data-backend="webgpu" class="chip">WebGPU</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="popover-wrap">
+      <button type="button" id="drawBtn" class="tb-btn" aria-haspopup="true" aria-expanded="false"
+        title="Drawing tools">
+        <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+          <path d="M4 20l4-1L20 7a2 2 0 0 0-3-3L5 16l-1 4z" />
+          <path d="M14 6l4 4" />
+        </svg>Draw
+      </button>
+      <div id="drawPopover" class="popover" hidden>
+        <div class="popover-section">
+          <span class="popover-title">Pen</span>
+          <div class="popover-row" id="penRow">
+            <button type="button" data-pen="-1" class="chip active">Off</button>
+            <button type="button" data-pen="2" class="chip">Draw</button>
+            <button type="button" data-pen="2" data-filled class="chip">Filled</button>
+            <button type="button" data-pen="0" class="chip">Erase</button>
+          </div>
+        </div>
+        <div class="popover-section">
+          <span class="popover-title">Apply to segmentation</span>
+          <div class="popover-row" id="drawApplyRow">
+            <button type="button" data-apply="1" class="chip">Append</button>
+            <button type="button" data-apply="2" class="chip">Remove</button>
+            <button type="button" data-apply="0" class="chip">Undo</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <span class="tb-flex"></span>
+
+    <button type="button" id="saveBtn" class="tb-btn" title="Save segmentation, input, or scene">
+      <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+        <path d="M12 3v12" />
+        <path d="M7 11l5 5 5-5" />
+        <path d="M4 21h16" />
+      </svg>Save
+    </button>
+    <button type="button" id="meshBtn" class="tb-btn" title="Generate a mesh of the segmentation for 3D printing">
+      <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+        <path d="M12 2.5l8.5 4.9v9.2L12 21.5l-8.5-4.9V7.4z" />
+        <path d="M3.5 7.4L20.5 16.6M20.5 7.4L3.5 16.6M12 2.5v19" />
+      </svg>Mesh
+    </button>
+
+    <button type="button" id="statsBtn" class="tb-btn"
+      title="Per-label volume and intensity statistics (min/max/quartiles/mean/stdev), viewable and saveable as CSV">
+      <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+        <path d="M5 21V10" />
+        <path d="M12 21V4" />
+        <path d="M19 21v-7" />
+      </svg>Stats
+    </button>
+
+    <span class="tb-divider"></span>
+
+    <button type="button" id="diagnosticsBtn" class="tb-icon-btn" title="Diagnostics" aria-label="Diagnostics">
+      <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+        <path d="M4 12h4l2 5 4-10 2 5h4" />
+      </svg>
+    </button>
+    <button type="button" id="aboutBtn" class="tb-icon-btn" title="About" aria-label="About">
+      <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
+        <circle cx="12" cy="12" r="9" />
+        <path d="M12 11v5" />
+        <path d="M12 7.5v.5" />
+      </svg>
+    </button>
+  </header>
+
+  <main id="canvas-container">
+    <canvas id="gl1"></canvas>
+    <div id="isoHud" hidden></div>
+    <!-- values are SLICE_TYPE; shown on phones only -->
+    <div class="pane-switcher" id="paneSwitcher" role="group" aria-label="Visible planes">
+      <button type="button" data-slice="3" class="active" title="All planes">All</button>
+      <button type="button" data-slice="0" title="Axial only">A</button>
+      <button type="button" data-slice="1" title="Coronal only">C</button>
+      <button type="button" data-slice="2" title="Sagittal only">S</button>
+      <button type="button" data-slice="4" title="3D render only">3D</button>
+      <button type="button" class="pane-reset" id="resetView" title="Reset zoom and pan">&#x27F2;</button>
+    </div>
+  </main>
+
+  <footer>
+    <div class="footer-content">
+      <div class="footer-item" id="location">Drag and drop NIfTI images, meshes, or DICOM files or folders</div>
+      <div class="footer-status">
+        <div class="footer-item">
+          <progress id="modelProgress" value="0" max="100" title="Model progress"></progress>
+        </div>
+        <div class="footer-item">
+          <span id="backendStatus" class="status-text"
+            title="Detecting backend...">Checking&hellip;</span>
+        </div>
+        <a class="star-link" href="https://github.com/neuroneural/brainchop" target="_blank"
+          title="Star brainchop on GitHub">
+          <span class="github-star">
+            <span class="star-glyph">&#9733;</span>
+            <span id="star-count">0</span>
+          </span>
+        </a>
+      </div>
+    </div>
+  </footer>
+
+  <dialog id="appDialog">
+    <button id="dialogXBtn" class="dialog-x" type="button" aria-label="Close">&times;</button>
+    <h3 id="dialogTitle">Message</h3>
+    <div id="dialogMessage"></div>
+    <div id="dialogButtons" class="dialog-buttons"></div>
+  </dialog>
+
+  <script type="module" src="./src/main.js"></script>
+</body>
+
+</html>
