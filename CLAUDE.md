@@ -3,8 +3,8 @@
 The leanest replica of brainchop-test's look and feel (`../brainchop-test`), built only from
 stock npm packages: `@niivue/niivue` 1.0.0-rc.15 (viewer), `@brainchop/mindgrab` 0.1.20260925
 (models), `@niivue/niimath` 1.4.20260924 (meshes, conform, reslice), `@niivue/nv-ext-dcm2niix`
-(DICOM). No patches to any package. Bun + Vite. The goal is to showcase clean usage: no excessive
-guards, comments only for non-obvious "why".
+1.0.0-rc.14 (DICOM). No patches to any package. Bun + Vite. The goal is to showcase clean usage:
+no excessive guards, comments only for non-obvious "why".
 
 ```sh
 bun install && bun run dev    # live demo
@@ -14,17 +14,17 @@ bun run build                 # dist/, relative base './' so the /brainchop-next
 
 Files: `index.html` (brainchop-test toolbar/footer markup + Mesh button + series picker + phone
 pane switcher), `src/main.js` (UI logic), `src/labels.js` (pure label helpers: RAS indexing, draw
-painting, per-label stats, CSV), `src/style.css` (trimmed from brainchop-test's
-`css/brainchop.css`; phone layout is a media query, not JS), `public/` (default image, favicon,
-`.nojekyll`).
+painting, per-label stats, CSV; tests in `labels.test.js`), `src/style.css` (trimmed from
+brainchop-test's `css/brainchop.css`; phone layout is a media query, not JS),
+`public/` (default image, favicon, `.nojekyll`).
 
 Features: models, opacity, drag modes, shading/renderer, Draw (pen + Append/Remove/Undo into
 label models), Stats (per-label volume/intensity, cm³/% toggle, isolate, CSV), Diagnostics
 (copied to clipboard, includes mindgrab log), Alt-click isolation (+ readout, Esc restores), Save
 (conformed / native segmentation, optional binary mask, conformed input, STL mesh, scene), Mesh
-(generate/cancel, shown over the voxels), drops of NIfTI, meshes and DICOM (series picker), phone
-layout (slim chrome, pane switcher, V cycles views). Not ported: tissue-overlay Alt-click
-isolation for the PVE model, the memory indicator.
+(generate/cancel, shown over the voxels), drops of NIfTI, meshes, NVD scenes and DICOM (series
+picker), phone layout (slim chrome, pane switcher, V cycles views). Not ported: tissue-overlay
+Alt-click isolation for the PVE model, the memory indicator.
 
 ## Deployment
 
@@ -57,12 +57,18 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
   `.dialog-buttons`: a bare `dialog button` rule leaks float/margin into the tiles.
 - Saves: native files are `saveVolume({filename:''})` bytes, i.e. uncompressed `.nii`; conformed
   files use niimath `conform()` + `resliceNN`. One niimath per task (`withNiimath`), disposed after.
-- Drops: `traverseDataTransferItems` must be called synchronously in the drop event. Files route
-  by NiiVue's own `meshExtensions` / `volumeExtensions`; `.json` are sidecars; everything else
-  goes to `runDcm2niix` (`niftiOnly: false`), whose failure is ignored if the drop also held a
-  volume or mesh. Several images open a picker (series number · description · echo suffix, shape
-  from a little-endian NIfTI-1 header) suggesting the largest single 3D volume. Stray recognised
-  files (e.g. a viewer's PNG icon on a DICOM CD) appear as extra picker tiles.
+- Drops: `traverseDataTransferItems` must be called synchronously in the drop event; a drop closes
+  `#appDialog` (Mesh/Stats/picker hold state the drop invalidates). A
+  `.nvd` scene replaces everything: app state is reset *before* `loadDocument` (it empties the
+  scene, can then throw, and fires no `volumeLoaded`), with `fill: 'current'` so settings the
+  scene omits keep the app's (else e.g. the V hotkey reverts to off). Scene `url`/thumbnail entries
+  are fetched (a foreign scene can ping a server; accepted). Files route by NiiVue's own
+  `meshExtensions` / `volumeExtensions`; `.json` are sidecars; everything else goes to
+  `runDcm2niix` (`niftiOnly: false`), whose failure is ignored if anything else loads, else
+  appended to the generic "Drop NIfTI…" error. Several images open a picker (series number ·
+  description · echo suffix, shape from a little-endian NIfTI-1 header) suggesting the largest
+  single 3D volume. Stray recognised files (e.g. a viewer's PNG icon on a DICOM CD) appear as
+  extra picker tiles.
 - Mesh: niimath writes mz3, loaded as the only mesh; Save → STL uses `nv.saveMesh` (winding
   verified outward). Do NOT set `meshXRay`: its pass redraws every depth-failing surface
   (`depthFunc(GREATER)`), so a folded brain shows its own sulcal walls through itself. In 3D the
@@ -91,4 +97,7 @@ untested (headless SwiftShader too slow); mindgrab's own suite covers webgl2 and
 - mindgrab: `detectBackend()` for the status badge; tissue colormaps like `MODELS[].colormap`.
 - Skipped deliberately: native `popover`/`commandfor` (positioning inside the phone toolbar's
   scrolling row), merging the stats wrapper/footer wrappers, SHA-pinned actions, zipping
-  multi-file saves (browsers may prompt once to allow multiple downloads).
+  multi-file saves (browsers may prompt once to allow multiple downloads). Audit 2026-09: Alt-click
+  via `locationChange` `values[1]` (reads the isolated buffer, so can't switch isolation), dropping
+  `describeSeries`' NIFTI guard (a bad .gz would fail the whole drop), dropping `ranInWorker`
+  (Diagnostics), resyncing drag/shading/pane toolbar state from a loaded scene.

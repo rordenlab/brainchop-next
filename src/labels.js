@@ -21,7 +21,7 @@ export function paintLabels(labels, vol, drawing, value) {
  * Per-label volume and intensity statistics of `image` (same grid as `labels`). Values are
  * grouped by label in one buffer and each group sorted, so quartiles are exact for any datatype.
  */
-export function labelStats(labels, image, { slope = 1, inter = 0, voxelMm3 = 1 } = {}) {
+export function labelStats(labels, image, { slope, inter, voxelMm3 }) {
   const count = new Uint32Array(256)
   for (const v of labels) count[v]++
   count[0] = 0 // background

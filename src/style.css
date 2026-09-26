@@ -1,4 +1,9 @@
 /* Toolbar, status bar and dialogs, after brainchop-test's css/brainchop.css */
+
+[hidden] {
+  display: none !important;
+}
+
 body {
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   margin: 0;
@@ -120,7 +125,6 @@ header {
 }
 
 .mini-slider::-webkit-slider-thumb {
-  -webkit-appearance: none;
   appearance: none;
   width: 12px;
   height: 12px;
@@ -150,15 +154,15 @@ header {
 }
 
 .segmented button {
-  padding: 5px 11px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 6px 9px;
   border: none;
   border-radius: 6px;
   background: transparent;
   color: #9aa4af;
-  font-size: 13px;
-  font-weight: 500;
   cursor: pointer;
-  white-space: nowrap;
   transition: background 0.15s ease, color 0.15s ease;
 }
 
@@ -171,15 +175,7 @@ header {
   color: #fff;
 }
 
-/* Compact icon-only variant */
-.segmented-icons button {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  padding: 6px 9px;
-}
-
-.segmented-icons .tb-ico {
+.segmented .tb-ico {
   width: 16px;
   height: 16px;
 }
@@ -203,10 +199,6 @@ header {
   display: flex;
   flex-direction: column;
   gap: 12px;
-}
-
-.popover[hidden] {
-  display: none;
 }
 
 .popover-section {
@@ -356,12 +348,9 @@ footer {
   flex: 0 0 auto;
 }
 
-#backendStatus {
+.status-text {
   color: #9aa0a6; /* until updateBackendStatus colours it */
   cursor: help;
-}
-
-.status-text {
   display: inline-flex;
   align-items: center;
   font-weight: 600;
@@ -395,12 +384,6 @@ progress {
 progress::-webkit-progress-bar {
   background: rgba(255, 255, 255, 0.12);
   border-radius: 999px;
-}
-
-progress::-webkit-progress-value {
-  background: linear-gradient(90deg, #3b82f6, #60a5fa);
-  border-radius: 999px;
-  transition: width 0.25s ease;
 }
 
 progress:indeterminate {
@@ -826,9 +809,6 @@ pre.diagnostics {
   font-variant-numeric: tabular-nums;
 }
 
-.stat-detail[hidden] {
-  display: none;
-}
 
 .stat-detail > div {
   display: flex;

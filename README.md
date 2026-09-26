@@ -14,7 +14,7 @@ bun run build    # static site in dist/
 ```
 
 Models: MindGrab skull stripping, 16chan18cls, mindmap, mindmap partial-volume (GM/WM/CSF), mindsnap (104 regions).
-Drop NIfTI images, meshes (STL, GIfTI, …), or DICOM files or folders; with several DICOM series a
+Drop NIfTI images, meshes (STL, GIfTI, …), NiiVue scenes (.nvd), or DICOM files or folders; with several DICOM series a
 picker suggests the 3D anatomical. **Mesh** generates a surface over the segmentation (Save writes
 it as STL); **Draw** edits labels, **Stats** reports per-region
 volume and intensity, Option/Alt-click shows one region alone, and **Save** writes native or

@@ -108,9 +108,10 @@ async function runModel() {
     const input = await nv.saveVolume({ volumeByIndex: 0, filename: '' })
     const opacity = Number($('opacitySlider1').value)
     const log = []
-    const options = { model: choice === 'pve' ? 'mindmap' : choice, worker: true, onLog: (line) => log.push(line) }
-    const result = choice === 'pve' ? await segmentTissues(input, options) : await segment(input, { ...options, mask: choice === 'mindgrab' })
+    const options = { worker: true, onLog: (line) => log.push(line) }
+    let result
     if (choice === 'pve') {
+      result = await segmentTissues(input, { ...options, model: 'mindmap' })
       for (const [tissue] of TISSUES) {
         // colormapType 1 (transparent below calMin): otherwise the 3D shader renders every tiny fraction opaque.
         await nv.addVolume({ url: new File([result.tissues[tissue]], `${tissue}.nii`), colormap: tissueColormaps[tissue], colormapType: 1, calMin: 0.03, calMax: 1, opacity })
@@ -119,6 +120,7 @@ async function runModel() {
       savedBgOpacity ??= $('opacitySlider0').value
       setBgOpacity(0.1) // fractions are hard to read over a bright T1
     } else {
+      result = await segment(input, { ...options, model: choice, mask: choice === 'mindgrab' })
       await nv.addVolume({ url: new File([result.image], choice === 'mindgrab' ? 'brain.nii' : `${choice}.nii`), colormap: choice === 'mindgrab' ? 'copper2' : 'gray', opacity })
       if (choice === 'mindgrab') seg = { kind: 'mask', mask: result.mask }
       else {
@@ -170,10 +172,10 @@ async function withPristineLabels(save) {
   }
 }
 
-const labelBytes = () => withPristineLabels(() => nv.saveVolume({ volumeByIndex: 1, filename: '' }))
+const overlayBytes = (i) => withPristineLabels(() => nv.saveVolume({ volumeByIndex: i, filename: '' }))
 
 // What the mesh and the binary mask enclose: every label, the brain mask, or GM+WM >= 0.5.
-const segBytes = async () => (seg.kind === 'labels' ? labelBytes() : seg.kind === 'mask' ? seg.mask : seg.brain)
+const segBytes = async () => (seg.kind === 'labels' ? overlayBytes(1) : seg.kind === 'mask' ? seg.mask : seg.brain)
 
 // Replaces any mesh in the scene; Save writes it as STL.
 async function createMesh(options) {
@@ -196,8 +198,7 @@ async function createMesh(options) {
 async function segmentationFiles(withMask) {
   const files = []
   for (let i = 1; i < nv.volumes.length; i++) {
-    const bytes = i === 1 ? await labelBytes() : await nv.saveVolume({ volumeByIndex: i, filename: '' })
-    files.push([nv.volumes[i].name.replace(NIFTI, ''), bytes])
+    files.push([nv.volumes[i].name.replace(NIFTI, ''), await overlayBytes(i)])
   }
   if (withMask) {
     const source = await segBytes()
@@ -248,7 +249,7 @@ function openSaveModal() {
   [])
   $('dialogMessage').querySelectorAll('.save-opt').forEach((btn) => {
     btn.onclick = () => {
-      const withMask = !!$('saveBinaryMask')?.checked
+      const withMask = $('saveBinaryMask')?.checked
       $('appDialog').close()
       void save(btn.dataset.kind, withMask)
     }
@@ -456,21 +457,33 @@ async function openFiles(files) {
   if (busy || !files.length) return // a run may have started while the drop was read
   setBusy(true)
   try {
+    const scene = files.find((f) => hasExtension(['NVD'], f))
+    if (scene) { // a scene replaces everything, so the rest of the drop is moot
+      // Reset first: loadDocument empties the scene before it can throw, and fires no volumeLoaded.
+      seg = null
+      savedBgOpacity = null
+      setIsolated(null)
+      $('modelSelect').value = ''
+      $('seriesSelect').hidden = true
+      await nv.loadDocument(scene, { fill: 'current' }) // settings the scene omits keep the app's (e.g. V hotkey)
+      setPen()
+      if (!nv.volumes.length) throw new Error('The scene contains no loadable image')
+      $('opacitySlider0').value = nv.volumes[0].opacity // the scene's, not the slider's
+      $('location').textContent = scene.name
+      return
+    }
     const meshes = files.filter((f) => hasExtension(nv.meshExtensions, f))
     const volumes = files.filter((f) => hasExtension(nv.volumeExtensions, f))
     const jsons = files.filter((f) => f.name.endsWith('.json'))
     const other = files.filter((f) => !meshes.includes(f) && !volumes.includes(f) && !jsons.includes(f))
     let converted = []
+    let dicomError
     if (other.length) {
       $('location').textContent = `Converting ${other.length} file(s) with dcm2niix…`
-      try {
-        converted = await runDcm2niix(other, { niftiOnly: false })
-      } catch (error) {
-        if (!meshes.length && !volumes.length) throw error // otherwise they were stray non-DICOM files
-      }
+      converted = await runDcm2niix(other, { niftiOnly: false }).catch((error) => { dicomError = error; return [] })
     }
     const images = [...volumes, ...converted.filter((f) => NIFTI.test(f.name))]
-    if (!meshes.length && !images.length) throw new Error('Drop NIfTI images, meshes (such as STL), or DICOM files or folders.')
+    if (!meshes.length && !images.length) throw new Error(`Drop NIfTI images, meshes (such as STL), NiiVue scenes (.nvd), or DICOM files or folders.${dicomError ? ` (dcm2niix: ${dicomError.message})` : ''}`)
     for (const mesh of meshes) await nv.addMesh({ url: mesh })
     $('location').textContent = meshes.map((f) => f.name).join(', ')
     if (!images.length) return
@@ -491,7 +504,9 @@ document.addEventListener('dragover', (e) => e.preventDefault())
 document.addEventListener('drop', (e) => {
   e.preventDefault()
   // Called synchronously: the item list is emptied once the event returns.
-  if (!busy) traverseDataTransferItems(e.dataTransfer.items).then(openFiles, (error) => showError('Could not read the drop', error))
+  if (busy) return
+  $('appDialog').close() // an open Mesh, Stats or series dialog holds state the drop invalidates
+  traverseDataTransferItems(e.dataTransfer.items).then(openFiles, (error) => showError('Could not read the drop', error))
 })
 $('seriesSelect').onchange = () => loadSeries(Number($('seriesSelect').value))
 
@@ -551,7 +566,7 @@ $('dialogXBtn').onclick = () => $('appDialog').close()
 $('appDialog').onclick = (e) => { if (e.target === $('appDialog')) $('appDialog').close() }
 $('aboutBtn').onclick = () => showModal('About BrainChop', `
   <p><strong>Privacy first.</strong> Everything runs locally in your browser; your images never leave your device.</p>
-  <p><strong>Controls.</strong> Drag and drop NIfTI images, meshes (such as STL), or DICOM files or folders; with
+  <p><strong>Controls.</strong> Drag and drop NIfTI images, meshes (such as STL), scenes (.nvd), or DICOM files or folders; with
   several DICOM series you choose one. Choose a model to segment the image, then <strong>Mesh</strong> to generate
   a mesh for 3D printing, and <strong>Save</strong> it as STL. Press <strong>C</strong> to cycle the clip plane and
   <strong>V</strong> to cycle views. <strong>Option/Alt-click</strong> a region to show it alone; click it again, click
