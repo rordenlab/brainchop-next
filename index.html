@@ -6,8 +6,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <link rel="icon" type="image/x-icon" href="favicon.ico" />
   <title>AI powered brain segmentation</title>
-  <script type="module" crossorigin src="./assets/index-CcGfCBn6.js"></script>
-  <link rel="stylesheet" crossorigin href="./assets/index-BI_jHFUC.css">
+  <script type="module" crossorigin src="./assets/index-BKTS4ung.js"></script>
+  <link rel="stylesheet" crossorigin href="./assets/index-Cc_vPYM-.css">
 </head>
 
 <body>
@@ -40,7 +40,7 @@
     <span class="tb-divider"></span>
 
     <!-- values are DRAG_MODE, applied to the right button (secondaryDragMode) -->
-    <div class="segmented segmented-icons" id="dragSegmented" role="group" aria-label="Mouse drag mode">
+    <div class="segmented" id="dragSegmented" role="group" aria-label="Mouse drag mode">
       <button type="button" data-drag="3" title="Pan / zoom" aria-label="Pan / zoom">
         <svg viewBox="0 0 24 24" class="tb-ico" aria-hidden="true">
           <path d="M12 2v20M2 12h20" />
@@ -177,10 +177,10 @@
 
   <footer>
     <div class="footer-content">
-      <div class="footer-item" id="location">Drag and drop NIfTI images, meshes, or DICOM files or folders</div>
+      <div class="footer-item" id="location">Drag and drop NIfTI images, meshes, scenes (.nvd), or DICOM files or folders</div>
       <div class="footer-status">
         <div class="footer-item">
-          <progress id="modelProgress" value="0" max="100" title="Model progress"></progress>
+          <progress id="modelProgress" value="0" title="Model progress"></progress>
         </div>
         <div class="footer-item">
           <span id="backendStatus" class="status-text"
