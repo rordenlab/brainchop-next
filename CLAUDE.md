@@ -42,6 +42,9 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
   is required by `vite build` (mindgrab's worker uses top-level await).
 - No `volumeIsNearestInterpolation`: since rc.15 label overlays are nearest in 2D by default and
   the 3D render stays linear (niivue/mono #210; brainchop-test needed a dist patch for this).
+- Label LUTs go in through `addVolume({ colormapLabel: makeLabelLut(cmap) })`, never
+  `setColormapLabel`: rc.15 then scans every voxel for legend centroids (~1 s; model16 click-to-overlay
+  2.88 → 1.90 s on M4 Pro Chrome). Upstream mono now computes centroids lazily; recheck on upgrade.
 - NiiVue caches overlay textures by `img` buffer identity: never edit `img` in place; assign a new
   array (Draw paints into `seg.labels.slice()`).
 - Label state: `seg.labels` holds the pristine voxels; the displayed `img` may be an isolation

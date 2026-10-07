@@ -1,4 +1,4 @@
-import { NiiVue, DRAG_MODE, SHOW_RENDER } from '@niivue/niivue'
+import { NiiVue, DRAG_MODE, SHOW_RENDER, makeLabelLut } from '@niivue/niivue'
 import { shiny } from '@niivue/niivue/assets/matcaps'
 import { Niimath } from '@niivue/niimath'
 import { runDcm2niix, traverseDataTransferItems } from '@niivue/nv-ext-dcm2niix'
@@ -121,12 +121,13 @@ async function runModel() {
       setBgOpacity(0.1) // fractions are hard to read over a bright T1
     } else {
       result = await segment(input, { ...options, model: choice, mask: choice === 'mindgrab' })
-      await nv.addVolume({ url: new File([result.image], choice === 'mindgrab' ? 'brain.nii' : `${choice}.nii`), colormap: choice === 'mindgrab' ? 'copper2' : 'gray', opacity })
-      if (choice === 'mindgrab') seg = { kind: 'mask', mask: result.mask }
-      else {
-        await nv.setColormapLabel(1, MODELS[choice].colormap)
-        seg = { kind: 'labels', model: choice, labels: nv.volumes[1].img }
-      }
+      const mask = choice === 'mindgrab'
+      // Build the LUT before adding. nv.setColormapLabel() would also scan all
+      // 16.7M voxels for label centroids (only the legend reads them, and it is
+      // off) and run a second updateGLVolume over the freshly uploaded volume.
+      await nv.addVolume({ url: new File([result.image], mask ? 'brain.nii' : `${choice}.nii`), colormap: mask ? 'copper2' : 'gray',
+        colormapLabel: mask ? null : makeLabelLut(MODELS[choice].colormap), opacity })
+      seg = mask ? { kind: 'mask', mask: result.mask } : { kind: 'labels', model: choice, labels: nv.volumes[1].img }
       restoreBgOpacity()
     }
     const { backend, elapsedMs, ranInWorker } = result
