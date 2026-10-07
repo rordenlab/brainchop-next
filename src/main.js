@@ -1,4 +1,4 @@
-import { NiiVue, DRAG_MODE, SHOW_RENDER, makeLabelLut } from '@niivue/niivue'
+import { NiiVue, DRAG_MODE, SHOW_RENDER, OVERLAY_ALPHA_BLEND, makeLabelLut } from '@niivue/niivue'
 import { shiny } from '@niivue/niivue/assets/matcaps'
 import { Niimath } from '@niivue/niimath'
 import { runDcm2niix, traverseDataTransferItems } from '@niivue/nv-ext-dcm2niix'
@@ -7,8 +7,8 @@ import { labelStats, paintLabels, rasIndex, statsCsv } from './labels.js'
 
 const $ = (id) => document.getElementById(id)
 const NIFTI = /\.nii(\.gz)?$/i
-// [GM, WM, CSF] tints: a light floor..tint ramp avoids a dark edge over bright T1 white matter.
-const TISSUES = [['gm', [255, 64, 64]], ['wm', [255, 255, 255]], ['csf', [64, 128, 255]]]
+// [GM, WM, CSF] tints, as in NiiVue's vox.tissues example.
+const TISSUES = [['gm', [224, 104, 104]], ['wm', [250, 250, 250]], ['csf', [120, 160, 255]]]
 
 const nv = new NiiVue({
   backend: 'webgl2',
@@ -23,6 +23,7 @@ const nv = new NiiVue({
   showRender: SHOW_RENDER.ALWAYS,
   isYoked3DTo2DZoom: true,
   isViewModeHotKeyEnabled: true, // V cycles the views
+  volumeOverlayAlphaBlend: OVERLAY_ALPHA_BLEND.ADDITIVE, // tissue fractions sum to 1: a mixed voxel stays opaque
   crosshairGap: 11,
 })
 // The current segmentation: { kind: 'labels', model, labels } (pristine voxels of overlay 1),
@@ -33,7 +34,6 @@ let lastVox = null // RAS voxel under the crosshair
 let lastRun = null // for Diagnostics
 let series = [] // { file, label, detail } per dropped image, in series order
 let busy = false
-let savedBgOpacity = null // BG slider value to restore after the tissue-fraction view dims it
 
 function setBusy(on) {
   busy = on
@@ -84,16 +84,6 @@ async function removeOverlays() {
   while (nv.volumes.length > 1) await nv.removeVolume(nv.volumes.length - 1)
 }
 
-function setBgOpacity(value) {
-  $('opacitySlider0').value = value
-  $('opacitySlider0').oninput()
-}
-
-function restoreBgOpacity() {
-  if (savedBgOpacity !== null) setBgOpacity(savedBgOpacity)
-  savedBgOpacity = null
-}
-
 // Every control that could load another image is disabled while this runs.
 async function runModel() {
   const choice = $('modelSelect').value
@@ -113,12 +103,11 @@ async function runModel() {
     if (choice === 'pve') {
       result = await segmentTissues(input, { ...options, model: 'mindmap' })
       for (const [tissue] of TISSUES) {
-        // colormapType 1 (transparent below calMin): otherwise the 3D shader renders every tiny fraction opaque.
-        await nv.addVolume({ url: new File([result.tissues[tissue]], `${tissue}.nii`), colormap: tissueColormaps[tissue], colormapType: 1, calMin: 0.03, calMax: 1, opacity })
+        await nv.addVolume({ url: new File([result.tissues[tissue]], `${tissue}.nii`), colormap: tissueColormaps[tissue], colormapType: 1, calMin: 0, calMax: 1, opacity })
+        const vol = nv.volumes.at(-1)
+        await nv.setModulationImage(vol.id, vol.id, 1) // alpha = fraction, so the additive blend sums to 1
       }
       seg = { kind: 'tissues', brain: result.tissues.brain }
-      savedBgOpacity ??= $('opacitySlider0').value
-      setBgOpacity(0.1) // fractions are hard to read over a bright T1
     } else {
       result = await segment(input, { ...options, model: choice, mask: choice === 'mindgrab' })
       const mask = choice === 'mindgrab'
@@ -128,7 +117,6 @@ async function runModel() {
       await nv.addVolume({ url: new File([result.image], mask ? 'brain.nii' : `${choice}.nii`), colormap: mask ? 'copper2' : 'gray',
         colormapLabel: mask ? null : makeLabelLut(MODELS[choice].colormap), opacity })
       seg = mask ? { kind: 'mask', mask: result.mask } : { kind: 'labels', model: choice, labels: nv.volumes[1].img }
-      restoreBgOpacity()
     }
     const { backend, elapsedMs, ranInWorker } = result
     lastRun = { model: name, backend, elapsedMs, ranInWorker, log }
@@ -137,7 +125,6 @@ async function runModel() {
   } catch (error) {
     $('modelSelect').value = '' // so the same model can be retried
     await removeOverlays()
-    restoreBgOpacity()
     showError('Segmentation failed', error)
   } finally {
     setBusy(false)
@@ -462,7 +449,6 @@ async function openFiles(files) {
     if (scene) { // a scene replaces everything, so the rest of the drop is moot
       // Reset first: loadDocument empties the scene before it can throw, and fires no volumeLoaded.
       seg = null
-      savedBgOpacity = null
       setIsolated(null)
       $('modelSelect').value = ''
       $('seriesSelect').hidden = true
@@ -581,7 +567,7 @@ $('aboutBtn').onclick = () => showModal('About BrainChop', `
 await nv.attachTo('gl1')
 // addColormap returns the canonical (capitalised) name the volumes must use.
 const tissueColormaps = Object.fromEntries(TISSUES.map(([name, [r, g, b]]) =>
-  [name, nv.addColormap(`tissue-${name}`, { R: [r >> 1, r], G: [g >> 1, g], B: [b >> 1, b], A: [0, 48], I: [0, 255] })]))
+  [name, nv.addColormap(`tissue-${name}`, { R: [r, r], G: [g, g], B: [b, b], A: [0, 255], I: [0, 255] })]))
 nv.addEventListener('sliceTypeChange', (e) => {
   paneButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.slice) === e.detail.sliceType))
 })
@@ -598,7 +584,6 @@ nv.addEventListener('volumeLoaded', () => {
   nv.closeDrawing()
   setPen()
   $('modelSelect').value = ''
-  restoreBgOpacity()
   $('opacitySlider0').oninput()
 })
 await nv.loadVolumes([{ url: './t1_crop.nii.gz' }])

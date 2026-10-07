@@ -1,9 +1,9 @@
 # CLAUDE.md — brainchop-next
 
 The leanest replica of brainchop-test's look and feel (`../brainchop-test`), built only from
-stock npm packages: `@niivue/niivue` 1.0.0-rc.15 (viewer), `@brainchop/mindgrab` 0.1.20260925
+stock npm packages: `@niivue/niivue` 1.0.0-rc.19 (viewer), `@brainchop/mindgrab` 0.1.20260925
 (models), `@niivue/niimath` 1.4.20260924 (meshes, conform, reslice), `@niivue/nv-ext-dcm2niix`
-1.0.0-rc.14 (DICOM). No patches to any package. Bun + Vite. The goal is to showcase clean usage:
+1.0.0-rc.17 (DICOM; its exact niivue peer must match). No patches to any package. Bun + Vite. The goal is to showcase clean usage:
 no excessive guards, comments only for non-obvious "why".
 
 ```sh
@@ -44,7 +44,7 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
   the 3D render stays linear (niivue/mono #210; brainchop-test needed a dist patch for this).
 - Label LUTs go in through `addVolume({ colormapLabel: makeLabelLut(cmap) })`, never
   `setColormapLabel`: rc.15 then scans every voxel for legend centroids (~1 s; model16 click-to-overlay
-  2.88 → 1.90 s on M4 Pro Chrome). Upstream mono now computes centroids lazily; recheck on upgrade.
+  2.88 → 1.90 s on M4 Pro Chrome). Still eager in rc.19; recheck on upgrade.
 - NiiVue caches overlay textures by `img` buffer identity: never edit `img` in place; assign a new
   array (Draw paints into `seg.labels.slice()`).
 - Label state: `seg.labels` holds the pristine voxels; the displayed `img` may be an isolation
@@ -76,8 +76,9 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
   verified outward). Do NOT set `meshXRay`: its pass redraws every depth-failing surface
   (`depthFunc(GREATER)`), so a folded brain shows its own sulcal walls through itself. In 3D the
   head render hides the mesh; BG opacity 0 reveals it.
-- Tissue fractions are uint8 with `scl_slope` 1/255 (never assume float32). Mesh the upstream
-  `tissues.brain` (GM+WM) at 0.5.
+- Tissue fractions are uint8 with `scl_slope` 1/255 (never assume float32). Shown as in NiiVue's
+  `vox.tissues` example: solid tints, alpha modulated by the fraction itself, ADDITIVE overlay
+  blend (the old BG dimming is gone). Mesh the upstream `tissues.brain` (GM+WM) at 0.5.
 - `addColormap` canonicalises names; use its return value (`tissueColormaps`).
 
 ## Testing
@@ -103,4 +104,9 @@ untested (headless SwiftShader too slow); mindgrab's own suite covers webgl2 and
   multi-file saves (browsers may prompt once to allow multiple downloads). Audit 2026-09: Alt-click
   via `locationChange` `values[1]` (reads the isolated buffer, so can't switch isolation), dropping
   `describeSeries`' NIFTI guard (a bad .gz would fail the whole drop), dropping `ranInWorker`
-  (Diagnostics), resyncing drag/shading/pane toolbar state from a loaded scene.
+  (Diagnostics), resyncing drag/shading/pane toolbar state from a loaded scene. Audit 2026-10
+  (rc.19): none of the niivue ideas above landed (`downloadBlob` exists but is unexported);
+  kept `colormapType: 1` on tissues (redundant with self-modulation, but matches vox.tissues);
+  `setModulationImage` resolves ids by name, so a background named `gm.nii` would be modulated
+  instead (accepted); foreign scenes with ≥2 overlays render ADDITIVE via `fill: 'current'`
+  (accepted, as for other settings).

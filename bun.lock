@@ -7,8 +7,8 @@
       "dependencies": {
         "@brainchop/mindgrab": "0.1.20260925",
         "@niivue/niimath": "1.4.20260924",
-        "@niivue/niivue": "1.0.0-rc.15",
-        "@niivue/nv-ext-dcm2niix": "1.0.0-rc.14",
+        "@niivue/niivue": "1.0.0-rc.19",
+        "@niivue/nv-ext-dcm2niix": "1.0.0-rc.17",
       },
       "devDependencies": {
         "vite": "^7.1.0",
@@ -88,9 +88,9 @@
 
     "@niivue/niimath": ["@niivue/niimath@1.4.20260924", "", {}, "sha512-ImIfMgVtSdnoJGPJMhlbvdjEDqQWsGHesEm3DeVEZab9PegGnuJoIZWNh6wX5hlOi66lRO2hHGuFOunL08/Lyg=="],
 
-    "@niivue/niivue": ["@niivue/niivue@1.0.0-rc.15", "", { "dependencies": { "cbor-x": "^1.6.0", "clipper2-ts": "^2.0.1-13", "earcut": "^3.0.2", "gl-matrix": "^3.4.4", "nifti-reader-js": "^0.8.0", "zarrita": "^0.7.3" } }, "sha512-uQrb7DUr4cfdxGPsnC2s3c5j5UXhqglbKRnFqUlUuwqOqwZwhEoawLiPqTMGu18yU4IPqoeCsvrigdCLJjUqAw=="],
+    "@niivue/niivue": ["@niivue/niivue@1.0.0-rc.19", "", { "dependencies": { "cbor-x": "^1.6.0", "clipper2-ts": "^2.0.1-13", "earcut": "^3.0.2", "gl-matrix": "^3.4.4", "nifti-reader-js": "^0.8.0", "zarrita": "^0.7.3" } }, "sha512-BOvYWYyzZgTzfFQTxSfl8ipe4BgGR7KzA8VwiBUDmLOqccS/wMIqeA1I+D9Ska50Io/4ANuxpN51QLLbmdsseA=="],
 
-    "@niivue/nv-ext-dcm2niix": ["@niivue/nv-ext-dcm2niix@1.0.0-rc.14", "", { "dependencies": { "@niivue/dcm2niix": "^1.2.0" }, "peerDependencies": { "@niivue/niivue": "1.0.0-rc.16" } }, "sha512-BfKnNBfQD+ltSujWd/QC/118z4twWdCjihRpUvRCGFvcCJ/ApO1asFFybDsa7IyEiBL7IoCr43tBMopYXttYrA=="],
+    "@niivue/nv-ext-dcm2niix": ["@niivue/nv-ext-dcm2niix@1.0.0-rc.17", "", { "dependencies": { "@niivue/dcm2niix": "^1.2.0" }, "peerDependencies": { "@niivue/niivue": "1.0.0-rc.19" } }, "sha512-eelJKu2oboNKcUg4lahkJ6ytLJaiA3/JRz5McVdKai59Pe8O/oENIQCeW8q1WUj5HtTNqeFO8zfV14b4hpF7qQ=="],
 
     "@rollup/rollup-android-arm-eabi": ["@rollup/rollup-android-arm-eabi@4.63.4", "", { "os": "android", "cpu": "arm" }, "sha512-I+BSHzTAhKN2n7ZwGZsegGcZjDpLqFOMAtJz/u6uFGe0pUFbq56dEHjqJV/ZUdRJtNXNxA+hREUatZBvMR3Oiw=="],
 

@@ -12,8 +12,8 @@
   "dependencies": {
     "@brainchop/mindgrab": "0.1.20260925",
     "@niivue/niimath": "1.4.20260924",
-    "@niivue/niivue": "1.0.0-rc.15",
-    "@niivue/nv-ext-dcm2niix": "1.0.0-rc.14"
+    "@niivue/niivue": "1.0.0-rc.19",
+    "@niivue/nv-ext-dcm2niix": "1.0.0-rc.17"
   },
   "devDependencies": {
     "vite": "^7.1.0"
