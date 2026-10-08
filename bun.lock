@@ -5,7 +5,7 @@
     "": {
       "name": "brainchop-next",
       "dependencies": {
-        "@brainchop/mindgrab": "0.1.20260925",
+        "@brainchop/mindgrab": "0.1.20261008",
         "@niivue/niimath": "1.4.20260924",
         "@niivue/niivue": "1.0.0-rc.19",
         "@niivue/nv-ext-dcm2niix": "1.0.0-rc.17",
@@ -16,7 +16,7 @@
     },
   },
   "packages": {
-    "@brainchop/mindgrab": ["@brainchop/mindgrab@0.1.20260925", "", { "dependencies": { "@webgpu/types": "^0.1.71" } }, "sha512-FFuU3IMQqrUuiHdm6l0//eXZ5X4vuOTgq4yK4qgUn5dOiMnY7LjRP+SpFULCZK3H4zW/mNuONXAE/Ex1PZvbvA=="],
+    "@brainchop/mindgrab": ["@brainchop/mindgrab@0.1.20261008", "", { "dependencies": { "@webgpu/types": "^0.1.71" } }, "sha512-pU+2152MT5mFqY3MbSV32jzVsm3yq5dOezM0HJGZTyPb5r8KxSri/BH9nFbI6docK9+TxFAH0JN2AmrqQmyB4A=="],
 
     "@cbor-extract/cbor-extract-darwin-arm64": ["@cbor-extract/cbor-extract-darwin-arm64@2.2.2", "", { "os": "darwin", "cpu": "arm64" }, "sha512-ZKZ/F8US7JR92J4DMct6cLW/Y66o2K576+zjlEN/MevH70bFIsB10wkZEQPLzl2oNh2SMGy55xpJ9JoBRl5DOA=="],
 

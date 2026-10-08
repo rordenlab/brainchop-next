@@ -1,7 +1,7 @@
 # CLAUDE.md — brainchop-next
 
 The leanest replica of brainchop-test's look and feel (`../brainchop-test`), built only from
-stock npm packages: `@niivue/niivue` 1.0.0-rc.19 (viewer), `@brainchop/mindgrab` 0.1.20260925
+stock npm packages: `@niivue/niivue` 1.0.0-rc.19 (viewer), `@brainchop/mindgrab` 0.1.20261008
 (models), `@niivue/niimath` 1.4.20260924 (meshes, conform, reslice), `@niivue/nv-ext-dcm2niix`
 1.0.0-rc.17 (DICOM; its exact niivue peer must match). No patches to any package. Bun + Vite. The goal is to showcase clean usage:
 no excessive guards, comments only for non-obvious "why".
