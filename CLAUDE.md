@@ -2,8 +2,8 @@
 
 The leanest replica of brainchop-test's look and feel (`../brainchop-test`), built only from
 stock npm packages: `@niivue/niivue` 1.0.0-rc.19 (viewer), `@brainchop/mindgrab` 0.1.20261008
-(models), `@niivue/niimath` 1.4.20260924 (meshes, conform, reslice), `@niivue/nv-ext-dcm2niix`
-1.0.0-rc.17 (DICOM; its exact niivue peer must match). No patches to any package. Bun + Vite. The goal is to showcase clean usage:
+(models), `@niivue/niimath` 1.4.20260924 (meshes, conform, reslice), `@niivue/dcm2niix`
+1.4.20261029 (DICOM). No patches to any package. Bun + Vite. The goal is to showcase clean usage:
 no excessive guards, comments only for non-obvious "why".
 
 ```sh
@@ -37,7 +37,7 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
 
 ## Load-bearing decisions
 
-- Vite `optimizeDeps.exclude` for niimath, nv-ext-dcm2niix + dcm2niix, mindgrab: the dev
+- Vite `optimizeDeps.exclude` for niimath, dcm2niix, mindgrab: the dev
   prebundler breaks their `new Worker(new URL(...))` / glue imports. `worker: { format: 'es' }`
   is required by `vite build` (mindgrab's worker uses top-level await).
 - No `volumeIsNearestInterpolation`: since rc.15 label overlays are nearest in 2D by default and
@@ -60,15 +60,16 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
   `.dialog-buttons`: a bare `dialog button` rule leaks float/margin into the tiles.
 - Saves: native files are `saveVolume({filename:''})` bytes, i.e. uncompressed `.nii`; conformed
   files use niimath `conform()` + `resliceNN`. One niimath per task (`withNiimath`), disposed after.
-- Drops: `traverseDataTransferItems` must be called synchronously in the drop event; a drop closes
+- Drops: `filesFromDataTransfer` must be called synchronously in the drop event; a drop closes
   `#appDialog` (Mesh/Stats/picker hold state the drop invalidates). A
   `.nvd` scene replaces everything: app state is reset *before* `loadDocument` (it empties the
   scene, can then throw, and fires no `volumeLoaded`), with `fill: 'current'` so settings the
   scene omits keep the app's (else e.g. the V hotkey reverts to off). Scene `url`/thumbnail entries
   are fetched (a foreign scene can ping a server; accepted). Files route by NiiVue's own
   `meshExtensions` / `volumeExtensions`; `.json` are sidecars; everything else goes to
-  `runDcm2niix` (`niftiOnly: false`), whose failure is ignored if anything else loads, else
-  appended to the generic "Drop NIfTI…" error. Several images open a picker (series number ·
+  `convert` (its `series` pair each image with its parsed sidecar; a nonzero exit keeps partial
+  output), whose failure is ignored if anything else loads, else its last log line is appended to
+  the generic "Drop NIfTI…" error. Several images open a picker (series number ·
   description · echo suffix, shape from a little-endian NIfTI-1 header) suggesting the largest
   single 3D volume. Stray recognised files (e.g. a viewer's PNG icon on a DICOM CD) appear as
   extra picker tiles.
@@ -91,6 +92,10 @@ export (signed volume positive, ~1.2–1.6 L), mesh generate/cancel/drop/save, s
 Draw/Stats/isolation/saves/Diagnostics, and the phone layout. Folder drops were simulated with mock
 FileSystemEntry objects (a real OS drag cannot be scripted). App-level WebGL2 fallback is
 untested (headless SwiftShader too slow); mindgrab's own suite covers webgl2 and cpu.
+dcm2niix 1.3.20260724 → 1.4.20261029 (stable = rc.2 bytes; fresh headless Chromium per run, drop → picker, M4 Pro):
+618-file dcm_qa_nih 263 → 203 ms, renderer +106 → +92 MB; UIH 3D T1 (160 files, 78 MB) 438 →
+413 ms, +352 → +277 MB (WORKERFS reads instead of copying into MEMFS); reproin XA (68 files)
+805 → 635 ms, +282 → +242 MB (rc.1 was 827 ms; outputs byte-identical to rc.1).
 
 ## Ideas that would shrink the app further
 
@@ -109,4 +114,4 @@ untested (headless SwiftShader too slow); mindgrab's own suite covers webgl2 and
   kept `colormapType: 1` on tissues (redundant with self-modulation, but matches vox.tissues);
   `setModulationImage` resolves ids by name, so a background named `gm.nii` would be modulated
   instead (accepted); foreign scenes with ≥2 overlays render ADDITIVE via `fill: 'current'`
-  (accepted, as for other settings).
+  (accepted, as for other settings). Audit 2026-10-29 (dcm2niix stable): kept the app's own sidecar pairing for dropped volumes, since dcm2niix `groupOutputs` keeps only its output extensions (drops MHA, MIF, …) and keys by `relativePath`, which dropped files lack. Pre-existing, accepted: a dropped `.json` containing `null` throws in `describeSeries`; same-named NIfTI in different folders share the first sidecar.

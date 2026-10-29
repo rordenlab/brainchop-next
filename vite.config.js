@@ -5,5 +5,5 @@ export default defineConfig({
   build: { target: 'esnext' },
   worker: { format: 'es' },
   // esbuild's dev prebundler breaks their `new Worker(new URL(...))` workers.
-  optimizeDeps: { exclude: ['@niivue/niimath', '@niivue/nv-ext-dcm2niix', '@niivue/dcm2niix', '@brainchop/mindgrab'] },
+  optimizeDeps: { exclude: ['@niivue/niimath', '@niivue/dcm2niix', '@brainchop/mindgrab'] },
 })

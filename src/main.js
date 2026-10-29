@@ -1,7 +1,7 @@
 import { NiiVue, DRAG_MODE, SHOW_RENDER, OVERLAY_ALPHA_BLEND, makeLabelLut } from '@niivue/niivue'
 import { shiny } from '@niivue/niivue/assets/matcaps'
 import { Niimath } from '@niivue/niimath'
-import { runDcm2niix, traverseDataTransferItems } from '@niivue/nv-ext-dcm2niix'
+import { convert, filesFromDataTransfer } from '@niivue/dcm2niix'
 import { segment, segmentTissues, checkSupport, checkWebgl2Support, MODELS } from '@brainchop/mindgrab'
 import { labelStats, paintLabels, rasIndex, statsCsv } from './labels.js'
 
@@ -395,11 +395,9 @@ async function niftiShape(file) {
 
 // Label each image by its sidecar (series number, description, echo/phase suffix) and summarise
 // its shape, so the user can tell a 3D anatomical from fMRI or a field map.
-async function describeSeries(images, sidecars) {
-  const entries = await Promise.all(images.map(async (file) => {
+async function describeSeries(images) {
+  const entries = await Promise.all(images.map(async ({ file, json: meta = {} }) => {
     const base = file.name.replace(NIFTI, '')
-    const sidecar = sidecars.find((f) => f.name === `${base}.json`)
-    const meta = sidecar ? await sidecar.text().then(JSON.parse).catch(() => ({})) : {}
     const suffix = base.match(/_(e\d+(_ph)?|ph)$/)?.[1]
     const { dims, mm } = NIFTI.test(file.name) ? await niftiShape(file) : { dims: [] }
     const volumes = dims[3] > 1 ? dims[3] : 1
@@ -407,7 +405,7 @@ async function describeSeries(images, sidecars) {
       label: [meta.SeriesNumber, meta.SeriesDescription ?? base, suffix].filter((x) => x !== undefined).join(' · '),
       detail: dims.length ? `${dims.slice(0, 3).join('×')} · ${mm.toFixed(1)} mm${volumes > 1 ? ` · ${volumes} volumes` : ''}` : '' }
   }))
-  return entries.sort((a, b) => a.number - b.number)
+  return entries.sort((a, b) => a.number - b.number || a.label.localeCompare(b.label, undefined, { numeric: true })) // e1 before e2
 }
 
 async function loadSeries(index) {
@@ -463,18 +461,20 @@ async function openFiles(files) {
     const volumes = files.filter((f) => hasExtension(nv.volumeExtensions, f))
     const jsons = files.filter((f) => f.name.endsWith('.json'))
     const other = files.filter((f) => !meshes.includes(f) && !volumes.includes(f) && !jsons.includes(f))
-    let converted = []
-    let dicomError
+    const sidecar = (file) => jsons.find((f) => f.name === `${file.name.replace(NIFTI, '')}.json`)?.text().then(JSON.parse).catch(() => undefined)
+    let dicom = { series: [], log: [] }
     if (other.length) {
       $('location').textContent = `Converting ${other.length} file(s) with dcm2niix…`
-      converted = await runDcm2niix(other, { niftiOnly: false }).catch((error) => { dicomError = error; return [] })
+      // A nonzero exit still returns the series that converted; rejection means the worker failed.
+      dicom = await convert(other).catch((error) => ({ series: [], log: [error.message] }))
     }
-    const images = [...volumes, ...converted.filter((f) => NIFTI.test(f.name))]
-    if (!meshes.length && !images.length) throw new Error(`Drop NIfTI images, meshes (such as STL), NiiVue scenes (.nvd), or DICOM files or folders.${dicomError ? ` (dcm2niix: ${dicomError.message})` : ''}`)
+    const images = [...await Promise.all(volumes.map(async (file) => ({ file, json: await sidecar(file) }))),
+      ...dicom.series.map((s) => ({ file: s.image, json: s.json }))]
+    if (!meshes.length && !images.length) throw new Error(`Drop NIfTI images, meshes (such as STL), NiiVue scenes (.nvd), or DICOM files or folders.${dicom.log.length ? ` (dcm2niix: ${dicom.log.at(-1)})` : ''}`)
     for (const mesh of meshes) await nv.addMesh({ url: mesh })
     $('location').textContent = meshes.map((f) => f.name).join(', ')
     if (!images.length) return
-    series = await describeSeries(images, [...jsons, ...converted.filter((f) => f.name.endsWith('.json'))])
+    series = await describeSeries(images)
     $('seriesSelect').replaceChildren(...series.map((s, i) => new Option(s.label, i)))
     $('seriesSelect').hidden = series.length < 2
     $('seriesSelect').selectedIndex = -1 // nothing chosen yet
@@ -493,7 +493,7 @@ document.addEventListener('drop', (e) => {
   // Called synchronously: the item list is emptied once the event returns.
   if (busy) return
   $('appDialog').close() // an open Mesh, Stats or series dialog holds state the drop invalidates
-  traverseDataTransferItems(e.dataTransfer.items).then(openFiles, (error) => showError('Could not read the drop', error))
+  filesFromDataTransfer(e.dataTransfer.items).then(openFiles, (error) => showError('Could not read the drop', error))
 })
 $('seriesSelect').onchange = () => loadSeries(Number($('seriesSelect').value))
 

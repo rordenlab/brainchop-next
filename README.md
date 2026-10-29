@@ -4,7 +4,7 @@ Minimal in-browser brain segmentation built only from stock npm packages:
 [@brainchop/mindgrab](https://www.npmjs.com/package/@brainchop/mindgrab) (models),
 [@niivue/niivue](https://www.npmjs.com/package/@niivue/niivue) (viewer),
 [@niivue/niimath](https://www.npmjs.com/package/@niivue/niimath) (meshing) and
-[@niivue/nv-ext-dcm2niix](https://www.npmjs.com/package/@niivue/nv-ext-dcm2niix) (DICOM).
+[@niivue/dcm2niix](https://www.npmjs.com/package/@niivue/dcm2niix) (DICOM).
 Images never leave the browser.
 
 ```sh
