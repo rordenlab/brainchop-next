@@ -34,9 +34,9 @@ Alt-click isolation for the PVE model, the memory indicator.
 `.github/workflows/deploy.yml` mirrors `../browserqc`: on push to `main`, Bun (pinned) runs
 `install --frozen-lockfile`, `test src`, `build`, then `JamesIves/github-pages-deploy-action`
 pushes `dist/` to the `gh-pages` branch (`contents: write`). Pages serves that branch (Settings →
-Pages → Deploy from a branch → `gh-pages` / root) at https://rordenlab.github.io/brainchop-next/.
+Pages → Deploy from a branch → `gh-pages` / root) at https://brain2print.org (custom domain via `public/CNAME`; the gh-pages deploy would otherwise wipe it).
 `public/.nojekyll` is required: Vite emits `assets/__vite-browser-external-*.js`, and Jekyll drops
-files starting with `_`. No custom domain (browserqc has `public/CNAME`).
+files starting with `_`.
 
 ## Load-bearing decisions
 
