@@ -3,8 +3,9 @@
 The leanest replica of brainchop-test's look and feel (`../brainchop-test`), built only from
 stock npm packages: `@niivue/niivue` 1.0.0-rc.61 (viewer), `@brainchop/mindgrab` 0.1.20261122
 (models), `@niivue/niimath` 1.4.20260924 (meshes, conform, reslice), `@niivue/dcm2niix`
-1.4.20261029 (DICOM). No patches to any package. Bun + Vite. The goal is to showcase clean usage:
-no excessive guards, comments only for non-obvious "why".
+1.4.20261029 (DICOM), `@itk-wasm/cuberille` 0.2.0 + `@itk-wasm/mesh-filters` 1.7.0 (watertight
+mesh). No patches to any package. Bun + Vite. The goal is to showcase clean usage: no excessive
+guards, comments only for non-obvious "why".
 
 ```sh
 bun install && bun run dev    # live demo
@@ -22,8 +23,10 @@ Features: models, opacity, drag modes, shading/renderer, Draw (pen + Append/Remo
 label models), Stats (per-label volume/intensity, cm³/% toggle, isolate, CSV), Diagnostics
 (copied to clipboard, includes mindgrab log), Alt-click isolation (+ readout, Esc restores), Save
 (conformed / native segmentation, optional binary mask, conformed input, STL mesh, scene), Mesh
-(generate/cancel, shown over the voxels), drops of NIfTI, meshes, NVD scenes and DICOM (series
-picker), phone layout (slim chrome, pane switcher, V cycles views). Not ported: tissue-overlay
+(brain2print parity: niimath with hollow / closing / fill bubbles / largest cluster / reduce / smooth,
+or ITK cuberille → repair → largest → smoothRemesh → repair; an isolated label is meshed alone),
+drops of NIfTI, meshes, NVD scenes and DICOM (series picker), phone layout (slim chrome, pane
+switcher, V cycles views). Not ported: tissue-overlay
 Alt-click isolation for the PVE model, the memory indicator.
 
 ## Deployment
@@ -37,7 +40,7 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
 
 ## Load-bearing decisions
 
-- Vite `optimizeDeps.exclude` for niimath, dcm2niix, mindgrab: the dev
+- Vite `optimizeDeps.exclude` for niimath, dcm2niix, mindgrab, `@itk-wasm/*`, `itk-wasm`: the dev
   prebundler breaks their `new Worker(new URL(...))` / glue imports. `worker: { format: 'es' }`
   is required by `vite build` (mindgrab's worker uses top-level await).
 - No `volumeIsNearestInterpolation`: since rc.15 label overlays are nearest in 2D by default and
@@ -49,8 +52,9 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
 - NiiVue caches overlay textures by `img` buffer identity: never edit `img` in place; assign a new
   array (Draw paints into `seg.labels.slice()`).
 - Label state: `seg.labels` holds the pristine voxels; the displayed `img` may be an isolation
-  copy. Saves, mesh and Stats read `seg.labels`; `withPristineLabels()` swaps it in around
-  `saveVolume` / `saveDocument`. Alt-click and Esc are ignored while busy for that reason.
+  copy. Saves and Stats read `seg.labels` (Mesh too, unless a label is isolated: then it meshes
+    the shown copy); `withPristineLabels()` swaps it in around `saveVolume` / `saveDocument`.
+  Alt-click and Esc are ignored while busy for that reason.
 - `setBusy` disables every control that can load an image or start work, so `runModel` needs no
   stale-image check. `openFiles` still checks `busy`: the drop's folder walk is asynchronous.
 - A new background image closes any unapplied drawing (`nv.closeDrawing()`; `loadVolumes` does
@@ -59,8 +63,8 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
   dialog can render over the canvas and swallow clicks. Dialog buttons are `[label, action]`
   pairs in `#dialogButtons`; tile dialogs (Save, series) pass `[]`. Button styling is scoped to
   `.dialog-buttons`: a bare `dialog button` rule leaks float/margin into the tiles.
-- Saves: native files are `saveVolume({filename:''})` bytes, i.e. uncompressed `.nii`; conformed
-  files use niimath `conform()` + `resliceNN`. One niimath per task (`withNiimath`), disposed after.
+- Saves: native files are `saveVolume({filename:''})` bytes (the mask: `binaryMask`), i.e.
+  uncompressed `.nii`; conformed files use niimath `conform()` + `resliceNN`. One niimath per task (`withNiimath`), disposed after.
 - Drops: `filesFromDataTransfer` must be called synchronously in the drop event; a drop closes
   `#appDialog` (Mesh/Stats/picker hold state the drop invalidates). A
   `.nvd` scene replaces everything: app state is reset *before* `loadDocument` (it empties the
@@ -78,6 +82,27 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
   verified outward). Do NOT set `meshXRay`: its pass redraws every depth-failing surface
   (`depthFunc(GREATER)`), so a folded brain shows its own sulcal walls through itself. In 3D the
   head render hides the mesh; BG opacity 0 reveals it.
+- ITK mesh (`itkMesh`), replacing brain2print's cbor-x / nifti-reader / static-copy:
+  - `binaryMask` (also the Save mask): niimath `thr 0.5 bin` as `char`, applying `scl_slope`, so
+    labels, mask and tissues all work. niimath GZIPS WHATEVER THE OUTPUT NAME SAYS (the old
+    `binary_mask_native.nii` was gzip), so it asks for `.nii.gz` and decompresses.
+  - Geometry from `nv.volumes[1].hdr` (`dims`, `affine`, qform or sform resolved; every mesh source
+    shares overlay 1's grid); voxels are the file's last bytes. RAS goes straight into ITK (axes
+    are arbitrary) and comes out RAS. Direction is ROW-major: the default image's direction is
+    symmetric, so only an oblique header catches a transpose (brain2print's helper is column-major).
+    Voxel data must own its buffer, or the wasm throws.
+  - mesh-filters 1.7.0 wrappers drop falsy options: zeros go as strings (`newtonIterations: '0'`,
+    `minimumComponentArea: '0'`, else repair silently drops components under 3% of the area even
+    with Largest off).
+  - One worker per run (cuberille's `getDefaultWebWorker`, terminated in `finally`): the package
+    default caches a failed pipeline download until reload. Pipelines (JS glue + WASM, ~2.3 MB,
+    zst 1.97 MB + JS 0.34 MB, the same if bundled) come from
+    version-pinned jsdelivr URLs, re-fetched per run (HTTP cache). Offline (`!navigator.onLine`)
+    errors become a dialog pointing to niimath; everything else works offline.
+  - Hand-written MZ3 to NiiVue: NiiVue reads `.iwm.cbor` but exports no CBOR encoder, and
+    `createMesh` is not exported.
+  - Verified (headed Chromium): oblique x-flipped and qform-only headers match niimath's extents
+    within 0.1 mm, STL volume positive; two spheres keep the small one with Largest off.
 - Tissue fractions are uint8 with `scl_slope` 1/255 (never assume float32). Shown as in NiiVue's
   `vox.tissues` example: solid tints, alpha modulated by the fraction itself, ADDITIVE overlay
   blend (the old BG dimming is gone). Mesh the upstream `tissues.brain` (GM+WM) at 0.5.
@@ -116,3 +141,7 @@ dcm2niix 1.3.20260724 → 1.4.20261029 (stable = rc.2 bytes; fresh headless Chro
   `setModulationImage` resolves ids by name, so a background named `gm.nii` would be modulated
   instead (accepted); foreign scenes with ≥2 overlays render ADDITIVE via `fill: 'current'`
   (accepted, as for other settings). Audit 2026-10-29 (dcm2niix stable): kept the app's own sidecar pairing for dropped volumes, since dcm2niix `groupOutputs` keeps only its output extensions (drops MHA, MIF, …) and keys by `relativePath`, which dropped files lack. Pre-existing, accepted: a dropped `.json` containing `null` throws in `describeSeries`; same-named NIfTI in different folders share the first sidecar.
+  Audit 2026-11-22 (ITK mesh): no repo test for `itkMesh` (needs a browser and the CDN; scratch
+  Playwright checks only). Unverified: niimath's `hollow` may keep only the largest component itself
+  (`coreFLT.c` under `NII2MESH`), so Largest off might not apply with Hollow on. Kept two smoothing
+  sliders (different algorithms and ranges).

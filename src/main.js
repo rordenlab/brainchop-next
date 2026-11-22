@@ -132,18 +132,97 @@ async function runModel() {
 
 function openMeshDialog() {
   if (!seg) return showModal('Mesh', '<p>Run a segmentation model first; the mesh encloses its labels.</p>')
-  showModal('Generate STL mesh', `
+  showModal('Generate STL mesh', `<div id="meshForm" data-method="niimath">
+    <label class="mesh-field">Method <select id="meshMethod">
+        <option value="niimath">niimath (fast)</option>
+        <option value="itk">ITK cuberille (watertight, slow, needs internet)</option></select>
+      <small>${isolated === null ? 'Encloses every label.' : `Encloses only ${labelName(isolated)}.`}</small></label>
+    <label class="mesh-field">Largest cluster only <input id="largest" type="checkbox" checked />
+      <small>Removes specks, but also drops separate structures.</small></label>
+    <label class="mesh-field niimath">Hollow <select id="hollow"><option value="0">solid</option>
+        ${[2, 3, 4, 8, 16].map((mm) => `<option value="${mm}">${mm} mm wall</option>`).join('')}</select>
+      <small>Less material to print, but more fragile.</small></label>
+    <label class="mesh-field niimath">Fill bubbles <input id="bubbles" type="checkbox" checked /></label>
+    <label class="mesh-field niimath">Closing (mm) <input id="close" type="number" min="0" max="100" value="0" /></label>
     <label class="mesh-field">Reduce to <output id="reduceValue">20%</output>
       <input id="reduce" type="range" min="5" max="100" step="5" value="20" />
-      <small>Fraction of triangles kept. Lower values make a smaller file.</small></label>
-    <label class="mesh-field">Smoothing iterations <output id="smoothValue">0</output>
+      <small>Lower values make a smaller, coarser mesh.</small></label>
+    <label class="mesh-field niimath">Smoothing iterations <output id="smoothValue">0</output>
       <input id="smooth" type="range" min="0" max="20" step="1" value="0" />
-      <small>Humphrey's Classes smoothing after meshing.</small></label>`, [
+      <small>Humphrey's Classes smoothing after meshing.</small></label>
+    <label class="mesh-field itk">Smoothing iterations <output id="itkSmoothValue">30</output>
+      <input id="itkSmooth" type="range" min="0" max="60" step="1" value="30" />
+      <small>Newton iterations of the remesher.</small></label></div>`, [
     ['Cancel', () => nv.removeAllMeshes()],
-    ['Create', () => void createMesh({ i: 0.5, b: 1, r: Number($('reduce').value) / 100, s: Number($('smooth').value) })],
+    ['Create', () => {
+      const value = (id) => Number($(id).value)
+      const largest = $('largest').checked
+      if ($('meshMethod').value === 'itk') void createMesh('ITK cuberille', (source) => itkMesh(source, { largest, reduce: value('reduce'), smooth: value('itkSmooth') }))
+      else void createMesh('niimath', (source) => niimathMesh(source, { hollow: value('hollow'), close: value('close'),
+        mesh: { i: 0.5, l: +largest, b: +$('bubbles').checked, r: value('reduce') / 100, s: value('smooth') } }))
+    }],
   ])
-  $('reduce').oninput = () => { $('reduceValue').textContent = `${$('reduce').value}%` }
-  $('smooth').oninput = () => { $('smoothValue').textContent = $('smooth').value }
+  $('meshMethod').onchange = () => { $('meshForm').dataset.method = $('meshMethod').value }
+  for (const id of ['reduce', 'smooth', 'itkSmooth']) $(id).oninput = () => { $(`${id}Value`).textContent = $(id).value + (id === 'reduce' ? '%' : '') }
+}
+
+const niimathMesh = (source, { hollow, close, mesh }) => withNiimath((niimath) => {
+  const image = niimath.image(source)
+  if (hollow) image.hollow(0.5, -hollow)
+  if (close) image.close(0.5, close, 2 * close)
+  return image.mesh(mesh).run('brainchop.mz3')
+})
+
+// Watertight and smooth, but slow. The ITK pipelines (~2.3 MB) are fetched from jsdelivr.
+async function itkMesh(source, { largest, reduce, smooth }) {
+  const [{ antiAliasCuberille, getDefaultWebWorker }, { keepLargestComponent, repair, smoothRemesh }] =
+    await Promise.all([import('@itk-wasm/cuberille'), import('@itk-wasm/mesh-filters')])
+  // cuberille treats its input as one binary mask. ITK's axes are arbitrary, so RAS goes in and comes out.
+  const { dims, affine } = nv.volumes[1].hdr // every mesh source shares overlay 1's grid
+  const size = dims.slice(1, 4)
+  const spacing = [0, 1, 2].map((col) => Math.hypot(affine[0][col], affine[1][col], affine[2][col]))
+  const mask = await binaryMask(source)
+  const image = {
+    imageType: { dimension: 3, componentType: 'uint8', pixelType: 'Scalar', components: 1 },
+    origin: affine.slice(0, 3).map((row) => row[3]),
+    spacing,
+    direction: Float64Array.from({ length: 9 }, (_, i) => affine[Math.floor(i / 3)][i % 3] / spacing[i % 3]), // row-major
+    size,
+    metadata: [],
+    data: new Uint8Array(mask.slice(mask.byteLength - size[0] * size[1] * size[2])), // voxels end the file
+  }
+  const offlineHint = (error) => {
+    throw navigator.onLine ? error : new Error('ITK cuberille downloads about 2.3 MB from cdn.jsdelivr.net. Connect to the internet, or use niimath, which works offline.')
+  }
+  // Task-scoped worker: a reused one keeps a failed download cached until reload.
+  const webWorker = await getDefaultWebWorker().catch(offlineHint)
+  // The wrappers drop falsy options, so zeros go as strings. Area '0': repair keeps every
+  // component (its default drops those under 3% of the area); Largest decides instead.
+  const repaired = async (mesh) => (await repair(mesh, { maximumHoleArea: 50, minimumComponentArea: '0', webWorker })).outputMesh
+  try {
+    let { mesh } = await antiAliasCuberille(image, { noClosing: true, webWorker })
+    mesh = await repaired(mesh)
+    if (largest) mesh = (await keepLargestComponent(mesh, { webWorker })).outputMesh
+    mesh = (await smoothRemesh(mesh, { newtonIterations: String(smooth), numberPoints: reduce, webWorker })).outputMesh
+    return mz3(await repaired(mesh))
+  } catch (error) {
+    offlineHint(error)
+  } finally {
+    webWorker.terminate()
+  }
+}
+
+// ITK mesh as MZ3 (NiiVue's own format). ponytail: assumes triangles only, which repair emits.
+function mz3({ points, cells }) {
+  const nFaces = cells.length / 5 // [cellType, 3, a, b, c] per triangle
+  const nVerts = points.length / 3
+  const buffer = new ArrayBuffer(16 + 12 * (nFaces + nVerts))
+  new Uint16Array(buffer, 0, 2).set([0x5a4d, 3]) // 'MZ', faces + vertices
+  new Uint32Array(buffer, 4, 3).set([nFaces, nVerts, 0])
+  const faces = new Uint32Array(buffer, 16, 3 * nFaces)
+  for (let i = 0; i < faces.length; i++) faces[i] = Number(cells[i + 2 * Math.floor(i / 3) + 2])
+  new Float32Array(buffer, 16 + 12 * nFaces, 3 * nVerts).set(points)
+  return buffer
 }
 
 // Runs a save with the pristine labels in place, even while one label is isolated on screen.
@@ -164,22 +243,30 @@ const overlayBytes = (i) => withPristineLabels(() => nv.saveVolume({ volumeByInd
 // What the mesh and the binary mask enclose: every label, the brain mask, or GM+WM >= 0.5.
 const segBytes = async () => (seg.kind === 'labels' ? overlayBytes(1) : seg.kind === 'mask' ? seg.mask : seg.brain)
 
-// Replaces any mesh in the scene; Save writes it as STL.
-async function createMesh(options) {
+// Replaces any mesh in the scene; Save writes it as STL. An isolated label is meshed alone.
+async function createMesh(method, build) {
   setBusy(true)
-  $('location').textContent = 'Creating mesh with niimath…'
+  $('location').textContent = `Creating mesh with ${method}…`
+  const start = performance.now()
   try {
-    const source = await segBytes()
-    const mesh = await withNiimath((niimath) => niimath.image(source).mesh(options).run('brainchop.mz3'))
+    const mesh = await build(await (isolated === null ? segBytes() : nv.saveVolume({ volumeByIndex: 1, filename: '' })))
     await nv.removeAllMeshes()
     await nv.addMesh({ url: new File([mesh], 'brainchop.mz3') })
-    $('location').textContent = `Mesh: ${(nv.meshes[0].indices.length / 3).toLocaleString()} triangles`
+    $('location').textContent = `Mesh: ${(nv.meshes[0].indices.length / 3).toLocaleString()} triangles, ${((performance.now() - start) / 1000).toFixed(1)} s`
   } catch (error) {
     showError('Mesh failed', error)
   } finally {
     setBusy(false)
   }
 }
+
+// uint8 0/1 NIfTI of what the mesh encloses (thr 0.5 suits labels, masks and fractions).
+// niimath gzips whatever the output name says.
+const binaryMask = (source) => withNiimath(async (niimath) => {
+  niimath.setOutputDataType('char')
+  const gz = await niimath.image(source).thr(0.5).bin().run('mask.nii.gz')
+  return new Response(gz.stream().pipeThrough(new DecompressionStream('gzip'))).arrayBuffer()
+})
 
 // Every overlay (plus, optionally, a 0/1 mask) as [name, uncompressed NIfTI bytes], in the input's own space.
 async function segmentationFiles(withMask) {
@@ -188,9 +275,7 @@ async function segmentationFiles(withMask) {
     files.push([nv.volumes[i].name.replace(NIFTI, ''), await overlayBytes(i)])
   }
   if (withMask) {
-    const source = await segBytes()
-    const threshold = seg.kind === 'tissues' ? 0.5 : 0 // fractions are 0..1; labels and masks are 0 or more
-    files.push(['binary_mask', await withNiimath((niimath) => niimath.image(source).thr(threshold).bin().run('mask.nii'))])
+    files.push(['binary_mask', await binaryMask(await segBytes())])
   }
   return files
 }
@@ -566,7 +651,8 @@ $('aboutBtn').onclick = () => showModal('About BrainChop', `
   <p><strong>Models</strong> from <a href="https://www.npmjs.com/package/@brainchop/mindgrab" target="_blank">@brainchop/mindgrab</a>
   run on WebGPU, or WebGL2 where WebGPU is unavailable. Rendering by
   <a href="https://github.com/niivue/niivue" target="_blank">NiiVue</a>; meshing by
-  <a href="https://github.com/rordenlab/niimath" target="_blank">niimath</a>.</p>`)
+  <a href="https://github.com/rordenlab/niimath" target="_blank">niimath</a> or
+  <a href="https://github.com/InsightSoftwareConsortium/ITK-Wasm" target="_blank">ITK-Wasm</a>.</p>`)
 
 // --- viewer ---
 await nv.attachTo('gl1')

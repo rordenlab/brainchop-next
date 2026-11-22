@@ -554,6 +554,7 @@ dialog {
   background-color: #333;
   /* Dark modal */
   color: white;
+  color-scheme: dark; /* native dark form controls */
 }
 
 dialog::backdrop {
@@ -610,7 +611,12 @@ dialog p {
   font-size: 13px;
 }
 
-.mesh-field input {
+#meshForm[data-method='niimath'] .itk,
+#meshForm[data-method='itk'] .niimath {
+  display: none;
+}
+
+.mesh-field input[type='range'] {
   grid-column: 1 / -1;
   accent-color: #3b82f6;
 }

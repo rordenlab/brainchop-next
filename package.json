@@ -11,6 +11,8 @@
   },
   "dependencies": {
     "@brainchop/mindgrab": "0.1.20261122",
+    "@itk-wasm/cuberille": "0.2.0",
+    "@itk-wasm/mesh-filters": "1.7.0",
     "@niivue/dcm2niix": "1.4.20261029",
     "@niivue/niimath": "1.4.20260924",
     "@niivue/niivue": "1.0.0-rc.61"
