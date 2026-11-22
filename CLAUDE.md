@@ -1,7 +1,7 @@
 # CLAUDE.md — brainchop-next
 
 The leanest replica of brainchop-test's look and feel (`../brainchop-test`), built only from
-stock npm packages: `@niivue/niivue` 1.0.0-rc.19 (viewer), `@brainchop/mindgrab` 0.1.20261008
+stock npm packages: `@niivue/niivue` 1.0.0-rc.61 (viewer), `@brainchop/mindgrab` 0.1.20261122
 (models), `@niivue/niimath` 1.4.20260924 (meshes, conform, reslice), `@niivue/dcm2niix`
 1.4.20261029 (DICOM). No patches to any package. Bun + Vite. The goal is to showcase clean usage:
 no excessive guards, comments only for non-obvious "why".
@@ -42,9 +42,10 @@ files starting with `_`. No custom domain (browserqc has `public/CNAME`).
   is required by `vite build` (mindgrab's worker uses top-level await).
 - No `volumeIsNearestInterpolation`: since rc.15 label overlays are nearest in 2D by default and
   the 3D render stays linear (niivue/mono #210; brainchop-test needed a dist patch for this).
-- Label LUTs go in through `addVolume({ colormapLabel: makeLabelLut(cmap) })`, never
-  `setColormapLabel`: rc.15 then scans every voxel for legend centroids (~1 s; model16 click-to-overlay
-  2.88 → 1.90 s on M4 Pro Chrome). Still eager in rc.19; recheck on upgrade.
+- Label LUTs: each model's table is registered once with `addColormap` (a `labels` array makes it a
+  label colormap) and passed as `addVolume({ colormap })`. By rc.61 the label LUT is derived from
+  `colormap`, so a continuous name (e.g. `gray`) clears a passed `colormapLabel`. Avoid
+  `setColormapLabel` (rc.15–19 scanned every voxel for legend centroids, ~1 s).
 - NiiVue caches overlay textures by `img` buffer identity: never edit `img` in place; assign a new
   array (Draw paints into `seg.labels.slice()`).
 - Label state: `seg.labels` holds the pristine voxels; the displayed `img` may be an isolation

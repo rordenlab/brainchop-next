@@ -10,10 +10,10 @@
     "preview": "vite preview"
   },
   "dependencies": {
-    "@brainchop/mindgrab": "0.1.20261008",
+    "@brainchop/mindgrab": "0.1.20261122",
     "@niivue/dcm2niix": "1.4.20261029",
     "@niivue/niimath": "1.4.20260924",
-    "@niivue/niivue": "1.0.0-rc.19"
+    "@niivue/niivue": "1.0.0-rc.61"
   },
   "devDependencies": {
     "vite": "^7.1.0"

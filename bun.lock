@@ -5,10 +5,10 @@
     "": {
       "name": "brainchop-next",
       "dependencies": {
-        "@brainchop/mindgrab": "0.1.20261008",
+        "@brainchop/mindgrab": "0.1.20261122",
         "@niivue/dcm2niix": "1.4.20261029",
         "@niivue/niimath": "1.4.20260924",
-        "@niivue/niivue": "1.0.0-rc.19",
+        "@niivue/niivue": "1.0.0-rc.61",
       },
       "devDependencies": {
         "vite": "^7.1.0",
@@ -16,7 +16,7 @@
     },
   },
   "packages": {
-    "@brainchop/mindgrab": ["@brainchop/mindgrab@0.1.20261008", "", { "dependencies": { "@webgpu/types": "^0.1.71" } }, "sha512-pU+2152MT5mFqY3MbSV32jzVsm3yq5dOezM0HJGZTyPb5r8KxSri/BH9nFbI6docK9+TxFAH0JN2AmrqQmyB4A=="],
+    "@brainchop/mindgrab": ["@brainchop/mindgrab@0.1.20261122", "", { "dependencies": { "@webgpu/types": "^0.1.71" } }, "sha512-nflbIU0RY4beFscUci//SvzFLrrZTAW5Dx5VOxp774o/CcSDiUNlXSKDjZXwD9nT2Ux0yAQTPtR+B0lwjmCTOg=="],
 
     "@cbor-extract/cbor-extract-darwin-arm64": ["@cbor-extract/cbor-extract-darwin-arm64@2.2.2", "", { "os": "darwin", "cpu": "arm64" }, "sha512-ZKZ/F8US7JR92J4DMct6cLW/Y66o2K576+zjlEN/MevH70bFIsB10wkZEQPLzl2oNh2SMGy55xpJ9JoBRl5DOA=="],
 
@@ -88,7 +88,7 @@
 
     "@niivue/niimath": ["@niivue/niimath@1.4.20260924", "", {}, "sha512-ImIfMgVtSdnoJGPJMhlbvdjEDqQWsGHesEm3DeVEZab9PegGnuJoIZWNh6wX5hlOi66lRO2hHGuFOunL08/Lyg=="],
 
-    "@niivue/niivue": ["@niivue/niivue@1.0.0-rc.19", "", { "dependencies": { "cbor-x": "^1.6.0", "clipper2-ts": "^2.0.1-13", "earcut": "^3.0.2", "gl-matrix": "^3.4.4", "nifti-reader-js": "^0.8.0", "zarrita": "^0.7.3" } }, "sha512-BOvYWYyzZgTzfFQTxSfl8ipe4BgGR7KzA8VwiBUDmLOqccS/wMIqeA1I+D9Ska50Io/4ANuxpN51QLLbmdsseA=="],
+    "@niivue/niivue": ["@niivue/niivue@1.0.0-rc.61", "", { "dependencies": { "cbor-x": "^1.6.0", "clipper2-ts": "^2.0.1-13", "earcut": "^3.0.2", "gl-matrix": "^3.4.4", "nifti-reader-js": "^0.8.1", "zarrita": "^0.7.3" } }, "sha512-0snyRPCRA9ibiHz0tBLMvIyKpBlZ9xaZIR2EaYiAj2BxwpYph5IrVb/HiCROzS3OEZzbXTZpYOolX9L72R2vtg=="],
 
     "@rollup/rollup-android-arm-eabi": ["@rollup/rollup-android-arm-eabi@4.63.4", "", { "os": "android", "cpu": "arm" }, "sha512-I+BSHzTAhKN2n7ZwGZsegGcZjDpLqFOMAtJz/u6uFGe0pUFbq56dEHjqJV/ZUdRJtNXNxA+hREUatZBvMR3Oiw=="],
 
@@ -168,7 +168,7 @@
 
     "nanoid": ["nanoid@3.3.19", "", { "bin": { "nanoid": "bin/nanoid.cjs" } }, "sha512-Y2tUNy4ouw6tq5oDSKeQYGOyhkUBhNOcGV/02KC+6kd9eDGqdZd++mjMiIDilrBYvjEnCYvVtsuHCuP+okSfug=="],
 
-    "nifti-reader-js": ["nifti-reader-js@0.8.0", "", { "dependencies": { "fflate": "^0.8.2" } }, "sha512-iO1iIhQDfKniy+l/86HfOPte7So+SxBmBiMSiUB2VXU7z4hSewMTlE3h0fCgfzfXvMUa+ilzLTJ2ZHmtFw6EWw=="],
+    "nifti-reader-js": ["nifti-reader-js@0.8.1", "", { "dependencies": { "fflate": "^0.8.2" } }, "sha512-inWrhWVqjn39gtTbK3DadYrevsmOzGK2a2LsgnwkNtvVlPrXbazOS2I2lzhmQa7KEwiegX4htGbi1moB0k/msA=="],
 
     "node-gyp-build-optional-packages": ["node-gyp-build-optional-packages@5.1.1", "", { "dependencies": { "detect-libc": "^2.0.1" }, "bin": { "node-gyp-build-optional-packages": "bin.js", "node-gyp-build-optional-packages-test": "build-test.js", "node-gyp-build-optional-packages-optional": "optional.js" } }, "sha512-+P72GAjVAbTxjjwUmwjVrqrdZROD4nf8KgpBoDxqXXTiYZZt/ud60dE5yvCSr9lRO8e8yv6kgJIC0K0PfZFVQw=="],
 

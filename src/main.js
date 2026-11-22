@@ -1,4 +1,4 @@
-import { NiiVue, DRAG_MODE, SHOW_RENDER, OVERLAY_ALPHA_BLEND, makeLabelLut } from '@niivue/niivue'
+import { NiiVue, DRAG_MODE, SHOW_RENDER, OVERLAY_ALPHA_BLEND } from '@niivue/niivue'
 import { shiny } from '@niivue/niivue/assets/matcaps'
 import { Niimath } from '@niivue/niimath'
 import { convert, filesFromDataTransfer } from '@niivue/dcm2niix'
@@ -100,8 +100,9 @@ async function runModel() {
     const log = []
     const options = { worker: true, onLog: (line) => log.push(line) }
     let result
+    const model = choice === 'pve' ? 'mindmap' : choice
     if (choice === 'pve') {
-      result = await segmentTissues(input, { ...options, model: 'mindmap' })
+      result = await segmentTissues(input, { ...options, model })
       for (const [tissue] of TISSUES) {
         await nv.addVolume({ url: new File([result.tissues[tissue]], `${tissue}.nii`), colormap: tissueColormaps[tissue], colormapType: 1, calMin: 0, calMax: 1, opacity })
         const vol = nv.volumes.at(-1)
@@ -111,15 +112,13 @@ async function runModel() {
     } else {
       result = await segment(input, { ...options, model: choice, mask: choice === 'mindgrab' })
       const mask = choice === 'mindgrab'
-      // Build the LUT before adding. nv.setColormapLabel() would also scan all
-      // 16.7M voxels for label centroids (only the legend reads them, and it is
-      // off) and run a second updateGLVolume over the freshly uploaded volume.
-      await nv.addVolume({ url: new File([result.image], mask ? 'brain.nii' : `${choice}.nii`), colormap: mask ? 'copper2' : 'gray',
-        colormapLabel: mask ? null : makeLabelLut(MODELS[choice].colormap), opacity })
+      // A label colormap name makes addVolume compile the label LUT itself.
+      await nv.addVolume({ url: new File([result.image], mask ? 'brain.nii' : `${choice}.nii`),
+        colormap: mask ? 'copper2' : labelColormaps[choice], opacity })
       seg = mask ? { kind: 'mask', mask: result.mask } : { kind: 'labels', model: choice, labels: nv.volumes[1].img }
     }
     const { backend, elapsedMs, ranInWorker } = result
-    lastRun = { model: name, backend, elapsedMs, ranInWorker, log }
+    lastRun = { model, name, backend, elapsedMs, ranInWorker, log }
     updateBackendStatus(backend)
     $('location').textContent = `${name}: ${(elapsedMs / 1000).toFixed(1)} s on ${backend}`
   } catch (error) {
@@ -340,14 +339,20 @@ function openStats() {
 async function openDiagnostics() {
   const adapter = await navigator.gpu?.requestAdapter().catch(() => null)
   const run = lastRun ?? {}
+  // Probed for the model run (else the largest): mindmap needs 768 MiB bindings, model16 512.
+  const model = run.model ?? 'mindmap'
+  const gpu = await checkSupport(model)
+  const gl = checkWebgl2Support(model)
   const text = [
     ':: Diagnostics https://github.com/neuroneural/brainchop/issues ::',
-    `Model: ${run.model ?? 'none run yet'}`,
+    `Model: ${run.name ?? 'none run yet'}`,
     `Inference backend: ${run.backend ?? '-'}${run.ranInWorker ? ' (worker)' : ''}`,
     `Inference ms: ${run.elapsedMs ? Math.round(run.elapsedMs) : '-'}`,
     `Input dims: ${nv.volumes[0]?.hdr.dims.slice(1, 4).join('×')}`,
     `Renderer: ${nv.backend}`,
     `WebGPU adapter: ${adapter ? `${adapter.info.vendor} ${adapter.info.architecture}`.trim() || 'yes' : 'none'}`,
+    `WebGPU for ${model}: ${gpu.supported ? (gpu.software ? 'software, skipped' : 'yes') : gpu.reasons.join('; ')}`,
+    `WebGL2 for ${model}: ${gl.supported ? 'yes' : gl.reasons.join('; ')} (${gl.renderer ?? '-'})`,
     `Secure context: ${isSecureContext}`,
     `Cross-origin isolated: ${crossOriginIsolated}`,
     `Cores: ${navigator.hardwareConcurrency}`,
@@ -568,6 +573,7 @@ await nv.attachTo('gl1')
 // addColormap returns the canonical (capitalised) name the volumes must use.
 const tissueColormaps = Object.fromEntries(TISSUES.map(([name, [r, g, b]]) =>
   [name, nv.addColormap(`tissue-${name}`, { R: [r, r], G: [g, g], B: [b, b], A: [0, 255], I: [0, 255] })]))
+const labelColormaps = Object.fromEntries(Object.entries(MODELS).map(([id, m]) => [id, nv.addColormap(`brainchop-${id}`, m.colormap)]))
 nv.addEventListener('sliceTypeChange', (e) => {
   paneButtons.forEach((b) => b.classList.toggle('active', Number(b.dataset.slice) === e.detail.sliceType))
 })
